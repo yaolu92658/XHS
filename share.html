@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <title>内容分享</title>
+  <script>
+    // 获取URL参数
+    function getQueryParam(name) {
+      const url = window.location.search;
+      const params = new URLSearchParams(url);
+      return params.get(name);
+    }
+
+    // base64解码
+    function b64DecodeUnicode(str) {
+      try {
+        return decodeURIComponent(escape(window.atob(str)));
+      } catch (e) {
+        return '';
+      }
+    }
+
+    // 尝试唤起App
+    function openApp(title, filename) {
+      // 这里用你App的URL Scheme
+      const scheme = `myapp://publish?title=${encodeURIComponent(title)}&filename=${encodeURIComponent(filename)}`;
+      window.location.href = scheme;
+    }
+
+    window.onload = function() {
+      const dataB64 = getQueryParam('data');
+      if (!dataB64) {
+        document.getElementById('content').innerText = '无效的分享链接';
+        return;
+      }
+      let data;
+      try {
+        data = JSON.parse(b64DecodeUnicode(dataB64));
+      } catch (e) {
+        document.getElementById('content').innerText = '数据解析失败';
+        return;
+      }
+      document.getElementById('title').innerText = data.title || '';
+      document.getElementById('filename').innerText = data.filename || '';
+      // 尝试唤起App
+      setTimeout(() => openApp(data.title, data.filename), 500);
+    }
+  </script>
+</head>
+<body>
+  <h2>内容分享</h2>
+  <div id="content">
+    <p>标题：<span id="title"></span></p>
+    <p>作品文件名：<span id="filename"></span></p>
+    <p>如果未自动跳转App，请手动复制内容到App发布页。</p>
+  </div>
+</body>
+</html> 
