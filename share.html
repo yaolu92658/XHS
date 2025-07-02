@@ -27,52 +27,113 @@
       font-size: 2rem;
       letter-spacing: 2px;
     }
-    .thumb-list {
+    .file-list {
       display: flex;
       flex-wrap: wrap;
       gap: 18px;
       justify-content: flex-start;
       margin-bottom: 18px;
     }
-    .thumb-item {
-      width: 110px;
-      height: 110px;
+    .file-item {
+      width: 120px;
       background: #f9fafc;
       border-radius: 10px;
       box-shadow: 0 2px 8px rgba(44,62,80,0.06);
       display: flex;
+      flex-direction: column;
       align-items: center;
-      justify-content: center;
       position: relative;
+      padding: 10px 6px 12px 6px;
       cursor: pointer;
-      overflow: hidden;
       border: 2px solid transparent;
       transition: border 0.2s;
     }
-    .thumb-item:hover {
+    .file-item:hover {
       border: 2px solid #4a90e2;
     }
-    .thumb-item img, .thumb-item video {
-      max-width: 100%;
-      max-height: 100%;
+    .file-thumb {
+      width: 90px;
+      height: 90px;
       border-radius: 8px;
       object-fit: cover;
+      margin-bottom: 6px;
+      background: #eee;
+      display: flex;
+      align-items: center;
+      justify-content: center;
     }
-    .download-all-btn {
-      display: inline-block;
+    .file-thumb video {
+      width: 90px;
+      height: 90px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #eee;
+    }
+    .file-thumb img {
+      width: 90px;
+      height: 90px;
+      border-radius: 8px;
+      object-fit: cover;
+      background: #eee;
+    }
+    .file-name {
+      font-size: 0.95rem;
+      color: #333;
+      margin-bottom: 2px;
+      text-align: center;
+      word-break: break-all;
+      max-width: 100px;
+    }
+    .file-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 2px;
+      justify-content: center;
+    }
+    .file-actions button {
+      background: #4a90e2;
+      color: #fff;
+      border: none;
+      border-radius: 4px;
+      padding: 3px 10px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .file-actions button:hover {
+      background: #357ab8;
+    }
+    .file-checkbox {
+      position: absolute;
+      left: 8px;
+      top: 8px;
+      transform: scale(1.2);
+    }
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      margin-bottom: 12px;
+    }
+    .controls label {
+      font-size: 1rem;
+      color: #4a90e2;
+      cursor: pointer;
+      user-select: none;
+    }
+    .download-selected-btn {
       background: linear-gradient(90deg, #4a90e2 0%, #2ecc71 100%);
       color: #fff;
       border: none;
       border-radius: 6px;
-      padding: 10px 28px;
+      padding: 8px 22px;
       font-size: 1.1rem;
       font-weight: bold;
       cursor: pointer;
-      margin: 0 0 18px 0;
       box-shadow: 0 2px 8px rgba(44,62,80,0.08);
       transition: background 0.2s;
     }
-    .download-all-btn:hover {
+    .download-selected-btn:hover {
       background: linear-gradient(90deg, #357ab8 0%, #27ae60 100%);
     }
     .tip {
@@ -81,7 +142,6 @@
       margin-bottom: 0;
       text-align: center;
     }
-    /* 预览弹窗 */
     .preview-modal {
       display: none;
       position: fixed;
@@ -125,9 +185,12 @@
     @media (max-width: 700px) {
       .container { max-width: 98vw; padding: 10px 2vw 10px 2vw; }
       .preview-content img { max-width: 98vw; }
+      .file-item { width: 44vw; min-width: 100px; }
+      .file-thumb, .file-thumb img, .file-thumb video { width: 40vw; height: 40vw; min-width: 80px; min-height: 80px; }
     }
   </style>
   <script>
+    let fileList = [];
     function getQueryParam(name) {
       const url = window.location.search;
       const params = new URLSearchParams(url);
@@ -148,9 +211,16 @@
       a.click();
       document.body.removeChild(a);
     }
-    function downloadAll(imgs, videos) {
-      imgs.forEach(url => downloadFile(url));
-      videos.forEach(url => downloadFile(url));
+    function downloadSelected() {
+      const checked = document.querySelectorAll('.file-checkbox:checked');
+      if (checked.length === 0) {
+        alert('请先勾选要下载的文件！');
+        return;
+      }
+      checked.forEach(cb => {
+        const idx = parseInt(cb.value);
+        downloadFile(fileList[idx].url);
+      });
     }
     function showPreview(url) {
       const modal = document.getElementById('previewModal');
@@ -162,6 +232,9 @@
       const modal = document.getElementById('previewModal');
       modal.classList.remove('active');
       document.getElementById('previewImg').src = '';
+    }
+    function toggleAll(checked) {
+      document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = checked);
     }
     window.onload = function() {
       const dataB64 = getQueryParam('data');
@@ -176,39 +249,52 @@
         document.getElementById('content').innerText = '数据解析失败';
         return;
       }
-      // 批量下载按钮
-      document.getElementById('downloadAllBtn').onclick = function() {
-        downloadAll(data.img_urls || [], data.video_urls || []);
-      };
-      // 图片缩略图
+      fileList = [];
+      let html = '';
+      let idx = 0;
       if (data.img_urls && Array.isArray(data.img_urls)) {
-        let imgsHtml = '';
-        data.img_urls.forEach(function(url, idx) {
-          imgsHtml += `<div class='thumb-item' title='点击预览' onclick='showPreview("${url}")'>` +
-                      `<img src="${url}" alt="图片${idx+1}"></div>`;
+        data.img_urls.forEach(function(url) {
+          fileList.push({type: 'img', url: url});
+          html += `<div class='file-item'>` +
+                  `<input type='checkbox' class='file-checkbox' value='${idx}'>` +
+                  `<div class='file-thumb' onclick='showPreview("${url}")'><img src="${url}" alt="图片"></div>` +
+                  `<div class='file-name'>图片${idx+1}</div>` +
+                  `<div class='file-actions'><button onclick='event.stopPropagation();downloadFile("${url}")'>下载</button></div>` +
+                  `</div>`;
+          idx++;
         });
-        document.getElementById('img_thumbs').innerHTML = imgsHtml;
       }
-      // 视频缩略图
       if (data.video_urls && Array.isArray(data.video_urls)) {
-        let videosHtml = '';
-        data.video_urls.forEach(function(url, idx) {
-          videosHtml += `<div class='thumb-item'>` +
-                        `<video src="${url}" controls></video></div>`;
+        data.video_urls.forEach(function(url) {
+          fileList.push({type: 'video', url: url});
+          html += `<div class='file-item'>` +
+                  `<input type='checkbox' class='file-checkbox' value='${idx}'>` +
+                  `<div class='file-thumb'><video src="${url}" controls></video></div>` +
+                  `<div class='file-name'>视频${idx+1}</div>` +
+                  `<div class='file-actions'><button onclick='event.stopPropagation();downloadFile("${url}")'>下载</button></div>` +
+                  `</div>`;
+          idx++;
         });
-        document.getElementById('video_thumbs').innerHTML = videosHtml;
       }
+      document.getElementById('file_list').innerHTML = html;
+      // 绑定全选/全不选
+      document.getElementById('selectAll').onclick = function() { toggleAll(true); };
+      document.getElementById('unselectAll').onclick = function() { toggleAll(false); };
+      document.getElementById('downloadSelectedBtn').onclick = downloadSelected;
     }
   </script>
 </head>
 <body>
   <div class="container">
     <h2>内容分享</h2>
-    <button class="download-all-btn" id="downloadAllBtn">下载全部内容</button>
+    <div class="controls">
+      <label id="selectAll" style="color:#2ecc71;">全选</label>
+      <label id="unselectAll" style="color:#e26a6a;">全不选</label>
+      <button class="download-selected-btn" id="downloadSelectedBtn">批量下载</button>
+    </div>
     <div class="tip">点击图片可预览大图，视频可直接播放</div>
     <div id="content">
-      <div class="thumb-list" id="img_thumbs"></div>
-      <div class="thumb-list" id="video_thumbs"></div>
+      <div class="file-list" id="file_list"></div>
     </div>
   </div>
   <!-- 预览弹窗 -->
