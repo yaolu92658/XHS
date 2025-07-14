@@ -237,6 +237,24 @@
       document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = checked);
     }
     window.onload = function() {
+      const id = getQueryParam('id');
+      if (id) {
+        // 新短链模式，AJAX请求API
+        fetch('http://150.158.168.185:5000/api/share?id=' + id)
+          .then(res => res.json())
+          .then(data => {
+            if (data.error) {
+              document.getElementById('content').innerText = '无效的分享链接';
+              return;
+            }
+            renderFileList(data);
+          })
+          .catch(() => {
+            document.getElementById('content').innerText = '数据获取失败';
+          });
+        return;
+      }
+      // 兼容老data参数
       const dataB64 = getQueryParam('data');
       if (!dataB64) {
         document.getElementById('content').innerText = '无效的分享链接';
@@ -249,6 +267,9 @@
         document.getElementById('content').innerText = '数据解析失败';
         return;
       }
+      renderFileList(data);
+    }
+    function renderFileList(data) {
       fileList = [];
       let html = '';
       let idx = 0;
